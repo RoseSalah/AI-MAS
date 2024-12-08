@@ -1,5 +1,4 @@
 import json
-import os
 from pprint import pprint
 import requests
 import os
@@ -7,7 +6,7 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
-subscription_key = os.getenv("API_KEY")
+subscription_key = os.getenv("BING_API_KEY")
 
 endpoint = "https://api.bing.microsoft.com/v7.0/search" #+ "/bing/v7.0/search" => causes 404 resource not found error
 
