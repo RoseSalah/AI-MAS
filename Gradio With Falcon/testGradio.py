@@ -15,7 +15,7 @@
 #     demo.launch()
 
 import gradio as gr
-from Falcon Model import falconToBingIntegration
+import Falcon_Model.falconToBingIntegration as APIs
 
 conversation_state = {
     "step": 1,              # Current step in the conversation
@@ -34,7 +34,7 @@ def model_response(message, history):
         # Step 1: Initial query
         conversation_state["user_query"] = message
         conversation_state["step"] = 2
-        response_text = falconToBingIntegration.enhanced_query_with_search(message)
+        response_text = APIs.enhanced_query_with_search(message)
         extracted_answer = response_text.split("Answer is: ")[1].strip()
 
 
@@ -89,7 +89,7 @@ def model_response(message, history):
         )
 
         # Query the model for market analysis
-        analysis = falconToBingIntegration.enhanced_query_with_search(enriched_query)
+        analysis = APIs.enhanced_query_with_search(enriched_query)
 
         # Reset conversation state for new interactions
         conversation_state["step"] = 1
