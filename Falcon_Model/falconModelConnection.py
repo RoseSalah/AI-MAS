@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
-FALCON_API_KEY = os.getenv("FALCON_API_KEY")
+FALCON_API_KEY = os.getenv("MODEL_API_KEY")
 # Hugging Face API link
 API_URL = "https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct"  
 
