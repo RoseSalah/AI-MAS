@@ -51,10 +51,36 @@ def enhanced_query_with_search(user_query, engines=["google", "bing"]):
     # Format the search results into a string
     search_snippets = "\n".join([f"{result['name']}: {result['url']}" for result in search_results])
     
-    # Prepare the prompt with search context
+    # Prepare the prompt with search context and the desired response format
     enriched_prompt = (
         f"Using the following context from multiple search engines:\n{search_snippets}\n"
-        f"Answer this query:\n{user_query}\nAnswer is:"
+        f"Answer this query:\n{user_query}\n"
+        f"Please format your response as follows:\n"
+        f"1. **Market Size**: Provide the market size, projections, and growth rate for the sector.\n"
+        f"2. **Marketing Insights**: \n"
+        f"   - Key Strategy: Summarize the main marketing strategy.\n"
+        f"   - Suggested Platforms: List the preferred platforms for marketing.\n"
+        f"   - Content Types: Mention the types of content that resonate with the target audience.\n"
+        f"3. **SWOT Analysis**: \n"
+        f"   Present the SWOT analysis in a **2x2 table** with the following columns:\n"
+        f"   - **Strengths**\n"
+        f"   - **Weaknesses**\n"
+        f"   - **Opportunities**\n"
+        f"   - **Threats**\n"
+        f"4. **Competitor Overview**: \n"
+        f"   Present the competitor analysis in a **table**, including:\n"
+        f"   - **Competitor**: Name of the competitor.\n"
+        f"   - **Market Share**: The competitor's market share percentage.\n"
+        f"   - **Strengths**: Key strengths of the competitor.\n"
+        f"   - **Weaknesses**: Weaknesses or challenges faced by the competitor.\n"
+        f"5. **Customer Segments**: \n"
+        f"   Provide a **pie chart** representation of the customer segments and their proportions. For each segment, include:\n"
+        f"   - **Name**: The segment's name (e.g., 'Tech-Savvy Millennial').\n"
+        f"   - **Demographics**: Age range, income level, location.\n"
+        f"   - **Behavioral Traits**: Preferences, shopping habits.\n"
+        f"   - **Pain Points**: Challenges or needs for this segment.\n"
+        f"   - **Buying Motives**: Key factors driving purchasing decisions.\n"
+        f"Answer is:"
     )
     
     # Send the enriched prompt to Mistral
