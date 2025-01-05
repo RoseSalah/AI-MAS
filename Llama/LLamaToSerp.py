@@ -126,7 +126,7 @@ def enhanced_query_with_search(user_query):
 
 # Example Usage
 if __name__ == "__main__":
-    query = "Do the market research for a social media platform made for Turkey only"
+    query = "Do the market research for a social media platform made for Turkey only targeting teenagers?"
     try:
         result = enhanced_query_with_search(query)
         print(result)
