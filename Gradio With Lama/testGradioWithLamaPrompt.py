@@ -1,11 +1,11 @@
 import random
 import gradio as gr
-import lamaToSerp
+from LLamaToSerp import enhanced_query_with_search  
 
 
 
 def model_response(message, history):
-    response_text= lamaToSerp.enhanced_query_with_search(message)
+    response_text= enhanced_query_with_search(message)
     return response_text
 
 
