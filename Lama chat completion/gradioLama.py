@@ -47,7 +47,7 @@ Please format your response as follows:
 # Function to perform Bing web search
 def bing_search(query):
     headers = {"Ocp-Apim-Subscription-Key": BING_API_KEY}
-    params = {"q": query, "count": 5}  # Fetch top 5 results
+    params = {"q": query, "count": 3}  # Fetch top 5 results
     response = requests.get(BING_ENDPOINT, headers=headers, params=params)
     if response.status_code == 200:
         return response.json()
