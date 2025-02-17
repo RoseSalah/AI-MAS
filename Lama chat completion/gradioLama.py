@@ -10,13 +10,22 @@ client = InferenceClient(api_key=config.HF_KEY)
 BING_API_KEY = config.BING_API_KEY  # Replace with your Bing API key
 BING_ENDPOINT = "https://api.bing.microsoft.com/v7.0/search"
 
-SYSTEM_PROMPT = """
-Your role is market analyst, 
-I want to provide you with a use case about specific business field ,
-I want you to ask me the following questions one by one , keep in memory the answers I'll provide to you in order to use them to make the market study and the SWOT analysis based on internet research,
-ask me about the location of the business , which sector , who are the potential customers and competitors , what is the nature / pattern of the business finally provide a market analysis study and SWOT analysis as well as competitors analysis based on all the information give a detailed market analysis , be specific to information provided and provide necessary information like the market size , Market trends and growth potential
+# Token limit constants
+MAX_TOTAL_TOKENS = 4096  
+SAFE_BUFFER = 500  # Keep a buffer to prevent exceeding limits
 
-Please format your response as follows:
+# Optimized system prompt (shorter but still effective)
+SYSTEM_PROMPT = """
+You are a market analyst. Ask the following questions one by one,meaning you ask a question
+and take user's answer then ask the next question, keep in memory the user's answers
+The questions are:
+- Business location?
+- Sector?
+- Potential customers
+- Who are the competitors
+- Business nature/pattern
+
+Based on user's responses, please format your response as follows:
 1. *Market Size*: Provide the market size, projections, and growth rate for the sector.
 2. *Marketing Insights*:
    - Key Strategy: Summarize the main marketing strategy.
@@ -29,7 +38,7 @@ Please format your response as follows:
    - *Opportunities*
    - *Threats*
 4. *Competitor Overview*:
-   Present the competitor analysis in a *table*, including:
+   **Real-World Competitor Analysis** *(Table)*, including:
    - *Competitor*: Name of the competitor.
    - *Market Share*: The competitor's market share percentage.
    - *Strengths*: Key strengths of the competitor.
@@ -40,108 +49,90 @@ Please format your response as follows:
    - *Demographics*: Age range, income level, location.
    - *Behavioral Traits*: Preferences, shopping habits.
    - *Pain Points*: Challenges or needs for this segment.
-   - *Buying Motives*: Key factors driving purchasing decisions.
-   """
+   - *Buying Motives*: Key factors driving purchasing decisions.Keep responses structured and precise.
 
+    **Use real-world examples whenever possible**. If competitor data is unavailable, search online.
+
+   """
 
 # Function to perform Bing web search
 def bing_search(query):
     headers = {"Ocp-Apim-Subscription-Key": BING_API_KEY}
-    params = {"q": query, "count": 3}  # Fetch top 5 results
+    params = {"q": query, "count": 3}  # Fetch top 3 results
     response = requests.get(BING_ENDPOINT, headers=headers, params=params)
     if response.status_code == 200:
         return response.json()
     else:
         return None
 
-# Function to extract relevant information from Bing search results
+# Extract relevant search results
 def extract_search_results(search_results):
     if not search_results:
         return "No web results found."
     
-    snippets = []
-    for result in search_results.get("webPages", {}).get("value", []):
-        snippets.append(f"- {result['snippet']}")
-    
+    snippets = [f"- {result['snippet']}" for result in search_results.get("webPages", {}).get("value", [])]
     return "\n".join(snippets)
 
-# Function to interact with the model
+# Limit chat history to avoid exceeding token limits
+def limit_history(history, max_entries=4):  
+    return history[-max_entries:]
+
+# Chat function with dynamic token adjustment
 def chat_with_model(user_input, history):
-    # Check if the user wants to perform a web search
-    if "use web search" in user_input.lower():
-        # Extract the query from the user input
-        query = user_input.replace("use web search", "").strip()
-        
-        # Perform Bing search
-        search_results = bing_search(query)
-        web_context = extract_search_results(search_results)
-        
-        # Add web context to the user input
-        user_input = f"{user_input}\n\nWeb search results:\n{web_context}"
-    
-    # Convert chat history into the format expected by the model
+    history = limit_history(history)  # Trim history to fit within token limits
+
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     for user_msg, model_msg in history:
         messages.append({"role": "user", "content": user_msg})
         messages.append({"role": "assistant", "content": model_msg})
-    
-    # Add the latest user input
+
     messages.append({"role": "user", "content": user_input})
-    
-    # Stream the response from the model
+
+    # Estimate token usage
+    total_tokens = sum(len(m["content"].split()) for m in messages)  
+    max_tokens = max(500, min(1500, MAX_TOTAL_TOKENS - total_tokens - SAFE_BUFFER))
+
+    if max_tokens < 100:  
+        history = limit_history(history, max_entries=3)  # Further trim history
+        return chat_with_model(user_input, history)  # Retry with smaller history
+
     stream = client.chat.completions.create(
-        model="meta-llama/Meta-Llama-3-8B-Instruct", 
-        messages=messages, 
-        max_tokens=500,
+        model="meta-llama/Llama-3.2-11B-Vision-Instruct",
+        messages=messages,
+        max_tokens=max_tokens,  
         stream=True
     )
-    
-    # Collect the response chunks
-    response = ""
-    for chunk in stream:
-        if chunk.choices[0].delta.content:
-            response += chunk.choices[0].delta.content
-    
-    # Append the response to the chat history
+
+    response = "".join(chunk.choices[0].delta.content or "" for chunk in stream)
     history.append((user_input, response))
     return history
 
-# Custom Gradio Chat Interface using Blocks
-with gr.Blocks() as demo:
-    # Chat history component
-    chatbot = gr.Chatbot(label="Llama 3.1 8B Chatbot")
+# Gradio UI (Updated Layout)
+with gr.Blocks(css=".chat-container { display: flex; flex-direction: column; height: 100vh; }") as demo:
+    gr.Markdown("# 📊 Market Analysis AI")
     
-    # Text input for user messages
-    user_input = gr.Textbox(label="Your Message", placeholder="Type your message here...")
-    
-    # Submit button
-    submit_button = gr.Button("Send")
-    
-    # Clear button to reset the chat
-    clear_button = gr.Button("Clear Chat")
-    
-    # Function to handle user input and update chat history
-    def respond(user_input, history):
-        history = history or []  # Initialize history if None
-        updated_history = chat_with_model(user_input, history)
-        return updated_history, ""  # Return updated history and clear input box
-    
-    # Connect the submit button to the respond function
-    submit_button.click(
-        fn=respond,
-        inputs=[user_input, chatbot],
-        outputs=[chatbot, user_input]
-    )
-    
-    # Clear the chat history
-    def clear_chat():
-        return None  # Reset chat history to empty
-    
-    clear_button.click(
-        fn=clear_chat,
-        inputs=[],
-        outputs=chatbot
-    )
+    chatbot = gr.Chatbot(label="Llama 3.2 Market Analyst", container=True)
 
-# Launch the Gradio app
+    with gr.Row():
+        user_input = gr.Textbox(
+            show_label=False, placeholder="Type your message here...", lines=1, scale=9
+        )
+        submit_button = gr.Button("➤", elem_id="send-button", scale=1)
+        clear_button = gr.Button("🗑️", elem_id="clear-button", scale=1)
+
+    def respond(user_input, history):
+        history = history or []
+        return chat_with_model(user_input, history), ""
+
+    # Send message when clicking the button
+    submit_button.click(fn=respond, inputs=[user_input, chatbot], outputs=[chatbot, user_input])
+
+    # Send message when pressing Enter
+    user_input.submit(fn=respond, inputs=[user_input, chatbot], outputs=[chatbot, user_input])
+    
+    def clear_chat():
+        return None
+
+    clear_button.click(fn=clear_chat, inputs=[], outputs=chatbot)
+
 demo.launch()
