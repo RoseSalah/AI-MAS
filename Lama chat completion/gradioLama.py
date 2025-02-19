@@ -6,24 +6,25 @@ import config
 # Initialize the InferenceClient with your API key
 client = InferenceClient(api_key=config.HF_KEY)
 
-# Bing Search API endpoint and key
-BING_API_KEY = config.BING_API_KEY  # Replace with your Bing API key
-BING_ENDPOINT = "https://api.bing.microsoft.com/v7.0/search"
+# Google Cloud Search API endpoint and key
+GCS_API_KEY = config.GCS_API_KEY  
+GCS_ENDPOINT = "https://customsearch.googleapis.com/customsearch/v1"
+CX = config.GCS_CX  
 
 # Token limit constants
 MAX_TOTAL_TOKENS = 4096  
-SAFE_BUFFER = 500  # Keep a buffer to prevent exceeding limits
+SAFE_BUFFER = 500  #a buffer to prevent exceeding limits
 
-# Optimized system prompt (shorter but still effective)
+# System prompt
 SYSTEM_PROMPT = """
 You are a market analyst. Ask the following questions one by one,meaning you ask a question
-and take user's answer then ask the next question, keep in memory the user's answers
+and take user's answer then ask the next question, keep in memory the user's answers, avoiding rigid question formats and
 The questions are:
 - Business location?
-- Sector?
+- **Sector/Industry** – Adapt phrasing, like "What field is your startup in?" or "Which industry are you focusing on?"
 - Potential customers
 - Who are the competitors
-- Business nature/pattern
+- **Business Model** – Keep it natural, e.g., "How do you plan to operate?" or "What's your revenue approach?"
 
 Based on user's responses, please format your response as follows:
 1. *Market Size*: Provide the market size, projections, and growth rate for the sector.
@@ -52,14 +53,15 @@ Based on user's responses, please format your response as follows:
    - *Buying Motives*: Key factors driving purchasing decisions.Keep responses structured and precise.
 
     **Use real-world examples whenever possible**. If competitor data is unavailable, search online.
+    **Be conversational, adaptive, and professional.** Never repeat the same phrasing or structure for questions.  
+    Use follow-ups and rephrase when necessary to make interactions feel natural.
+       """
 
-   """
+# Function to perform Google Cloud Search
 
-# Function to perform Bing web search
-def bing_search(query):
-    headers = {"Ocp-Apim-Subscription-Key": BING_API_KEY}
-    params = {"q": query, "count": 3}  # Fetch top 3 results
-    response = requests.get(BING_ENDPOINT, headers=headers, params=params)
+def gcs_search(query):
+    params = {"q": query, "key": GCS_API_KEY, "cx": CX}
+    response = requests.get(GCS_ENDPOINT, params=params)
     if response.status_code == 200:
         return response.json()
     else:
@@ -67,10 +69,10 @@ def bing_search(query):
 
 # Extract relevant search results
 def extract_search_results(search_results):
-    if not search_results:
+    if not search_results or "items" not in search_results:
         return "No web results found."
     
-    snippets = [f"- {result['snippet']}" for result in search_results.get("webPages", {}).get("value", [])]
+    snippets = [f"- {item['snippet']}" for item in search_results["items"]]
     return "\n".join(snippets)
 
 # Limit chat history to avoid exceeding token limits
@@ -81,12 +83,21 @@ def limit_history(history, max_entries=4):
 def chat_with_model(user_input, history):
     history = limit_history(history)  # Trim history to fit within token limits
 
+    # Perform Google Cloud Search for every user input
+    search_results = gcs_search(user_input)
+    web_context = extract_search_results(search_results)
+    
+    # Add web context to the user input
+    user_input_with_context = f"{user_input}\n\nWeb search results:\n{web_context}"
+
+    # Convert chat history into the format expected by the model
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     for user_msg, model_msg in history:
         messages.append({"role": "user", "content": user_msg})
         messages.append({"role": "assistant", "content": model_msg})
 
-    messages.append({"role": "user", "content": user_input})
+    # Append the user input with web context
+    messages.append({"role": "user", "content": user_input_with_context})
 
     # Estimate token usage
     total_tokens = sum(len(m["content"].split()) for m in messages)  
