@@ -27,7 +27,7 @@ Business Analysis Questions you should ask in order:
 2.Sector/Industry – Adapt phrasing, like "What field is your startup in?" or "Which industry are you focusing on?"
 3.Potential Customers.
 4.Business Model – Keep it natural, ask about how the user plans to operate and the nature of their business.
-4.Unique advantages that the business have over competitors.
+5.Unique advantages that the business have over competitors.
 
 Market Analysis Output Format:
 Based on the user's responses, format the output as follows:
