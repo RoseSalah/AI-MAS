@@ -3,10 +3,9 @@ from huggingface_hub import InferenceClient
 import requests
 import config
 
-# Initialize the InferenceClient with your API key
 client = InferenceClient(api_key=config.HF_KEY)
 
-# Bing Search API endpoint and key
+
 BING_API_KEY = config.BING_API_KEY  
 BING_ENDPOINT = "https://api.bing.microsoft.com/v7.0/search"
 
@@ -15,7 +14,6 @@ BING_ENDPOINT = "https://api.bing.microsoft.com/v7.0/search"
 MAX_TOTAL_TOKENS = 4096  
 SAFE_BUFFER = 500  #a buffer to prevent exceeding limits
 
-# System prompt
 SYSTEM_PROMPT = """
 You are a market analyst. First, greet the user appropriately if they say "hi," "hello," "how are you?" or any similar greeting. Respond in a friendly and professional manner and ask if they need help in their business. If they ask how you are, reply briefly and then transition smoothly into the business discussion.  
 ### Instructions:
@@ -23,14 +21,18 @@ You are a market analyst. First, greet the user appropriately if they say "hi," 
 3. **Do not generate detailed explanations** before moving to the next question. Keep responses concise unless specifically asked for details.
 
 Business Analysis Questions you should ask in order:
-1.Business Location.
-2.Sector/Industry – Adapt phrasing, like "What field is your startup in?" or "Which industry are you focusing on?"
-3.Potential Customers.
-4.Business Model – Keep it natural, ask about how the user plans to operate and the nature of their business.
-5.Unique advantages that the business have over competitors.
+1.***Business Location.***
+
+2.***Sector/Industry – Adapt phrasing, like "What field is your startup in?" or "Which industry are you focusing on?".***
+
+3.***Potential Customers.***
+
+4.***Business Model – Keep it natural, ask about how the user plans to operate and the nature of their business.***
+
+5.***Unique advantages that the business have over competitors.***
 
 Market Analysis Output Format:
-Based on the user's responses, format the output as follows:
+Based on the user's responses, format the output as follows, provide the output immediately after the user answers the last question:
 
 1. *Market Size*: Provide the market size, projections, and growth rate for the sector.
 2. *Marketing Insights*:
@@ -57,14 +59,13 @@ Based on the user's responses, format the output as follows:
    - *Buying Motives*: Key factors driving purchasing decisions.Keep responses structured and precise.
 
 Be professional and conversational, Avoid repetitive phrasing and rigid structures.
+
 Use follow-ups and rephrase when necessary to keep the interaction natural. do not provide market details before finishing all questions.
-If the user says "I don't know" or "I haven’t done enough research," take the initiative to conduct the necessary research.
-After providing the analysis, ask the user if they found it helpful and how else you can assist
+
+***After providing the analysis, ask the user if they found it helpful and how else you can assist.***
 
 """
-# Function to perform Google Cloud Search
 
-# Function to perform Bing web search
 def bing_search(query):
     headers = {"Ocp-Apim-Subscription-Key": BING_API_KEY}
     params = {"q": query, "count": 3}  # Fetch top 3 results
@@ -74,7 +75,6 @@ def bing_search(query):
     else:
         return None
 
-# Extract relevant search results
 def extract_search_results(search_results):
     if not search_results:
         return ""
@@ -87,25 +87,25 @@ def extract_search_results(search_results):
 def limit_history(history, max_entries=4):  
     return history[-max_entries:]
 
-# Chat function with dynamic token adjustment
 def chat_with_model(user_input, history):
     history = limit_history(history)  # Trim history to fit within token limits
 
-    # Perform Google Cloud Search for every user input
     search_results = bing_search(user_input)
     web_context = extract_search_results(search_results)
-    
-    # Add web context to the user input
-    user_input_with_context = f"{user_input}\n\nWeb search results:\n{web_context}"
 
     # Convert chat history into the format expected by the model
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages =[{"role": "system", "content": SYSTEM_PROMPT}]
     for user_msg, model_msg in history:
         messages.append({"role": "user", "content": user_msg})
         messages.append({"role": "assistant", "content": model_msg})
 
-    # Append the user input with web context
-    messages.append({"role": "user", "content": user_input_with_context})
+    messages.append({"role": "user", "content": user_input})
+
+    if web_context:
+        messages.append({
+            "role": "system", 
+            "content": f"Here are relevant web search results based on the user's input:\n{web_context}"
+        })
 
     # Estimate token usage
     total_tokens = sum(len(m["content"].split()) for m in messages)  
@@ -126,6 +126,7 @@ def chat_with_model(user_input, history):
     history.append((user_input, response))
     return history
 
+
 # Gradio UI (Updated Layout)
 with gr.Blocks(css=".chat-container { display: flex; flex-direction: column; height: 100vh; }") as demo:
     gr.Markdown("# 📊 Market Analysis AI")
@@ -136,9 +137,10 @@ with gr.Blocks(css=".chat-container { display: flex; flex-direction: column; hei
         user_input = gr.Textbox(
             show_label=False, placeholder="Type your message here...", lines=1, scale=9
         )
+
         submit_button = gr.Button("➤", elem_id="send-button", scale=1)
         clear_button = gr.Button("🗑", elem_id="clear-button", scale=1)
-
+ 
     def respond(user_input, history):
         history = history or []
         return chat_with_model(user_input, history), ""
